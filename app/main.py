@@ -1,8 +1,10 @@
 import asyncio, os, time
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from fastembed import TextEmbedding
 from openai import AsyncOpenAI
@@ -20,6 +22,7 @@ LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 DEFAULT_TOP_K = int(os.getenv("TOP_K", "5"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "400"))
+STATIC_DIR = Path(__file__).parent / "static"
 
 SYSTEM_PROMPT = (
     "You are the shopping assistant for an online store during its Black Friday sale. "
@@ -162,3 +165,7 @@ async def ask(req: AskRequest):
             IN_FLIGHT.dec()
 
     return StreamingResponse(body(), media_type="text/plain; charset=utf-8")
+
+
+# The demo page, served at "/". Mounted last so it doesn't shadow /ask, /health or /metrics.
+app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="static")

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shopping Assistant</title>
+  <style>
+    :root {
+      --bg: #f6f7fb; --card: #ffffff; --text: #1d2330; --muted: #6b7280;
+      --accent: #e8590c; --accent-dark: #c2470a; --border: #e3e6ee; --chip: #fff4ec;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    header {
+      background: var(--text); color: #fff; padding: 18px 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    header .badge {
+      background: var(--accent); color: #fff; font-weight: 700; font-size: 13px;
+      padding: 4px 10px; border-radius: 999px; letter-spacing: .5px;
+    }
+    header h1 { font-size: 20px; margin: 0; font-weight: 600; }
+    main { max-width: 860px; margin: 28px auto; padding: 0 16px; }
+    .card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 20px; margin-bottom: 18px;
+    }
+    label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 8px; }
+    textarea {
+      width: 100%; min-height: 70px; resize: vertical; font: inherit; font-size: 16px;
+      padding: 12px; border: 1px solid var(--border); border-radius: 10px;
+    }
+    .row { display: flex; gap: 14px; align-items: end; margin-top: 14px; flex-wrap: wrap; }
+    .row .field { display: flex; flex-direction: column; }
+    input[type=number] {
+      width: 90px; font: inherit; font-size: 16px; padding: 10px;
+      border: 1px solid var(--border); border-radius: 10px;
+    }
+    button.ask {
+      background: var(--accent); color: #fff; border: none; border-radius: 10px;
+      font: inherit; font-size: 16px; font-weight: 600; padding: 11px 26px; cursor: pointer;
+    }
+    button.ask:hover { background: var(--accent-dark); }
+    button.ask:disabled { opacity: .6; cursor: wait; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      background: var(--chip); border: 1px solid #ffd8bf; color: var(--accent-dark);
+      border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 14px; cursor: pointer;
+    }
+    .chip:hover { background: #ffe8d9; }
+    #answer { white-space: pre-wrap; line-height: 1.6; font-size: 16px; min-height: 60px; }
+    #answer.placeholder { color: var(--muted); }
+    .timings { display: flex; gap: 22px; margin-top: 14px; font-size: 14px; color: var(--muted); }
+    .timings b { color: var(--text); font-variant-numeric: tabular-nums; }
+    .error { color: #b42318; }
+    .spinner {
+      display: inline-block; width: 14px; height: 14px; border: 2px solid var(--muted);
+      border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite;
+      vertical-align: middle; margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="badge">BLACK FRIDAY</span>
+    <h1>Shopping Assistant</h1>
+  </header>
+
+  <main>
+    <div class="card">
+      <label for="question">What are you looking for?</label>
+      <textarea id="question" placeholder="e.g. I need a waterproof jacket for hiking under £100"></textarea>
+      <div class="row">
+        <div class="field">
+          <label for="topk">Products to retrieve</label>
+          <input id="topk" type="number" min="1" max="15" value="5">
+        </div>
+        <button class="ask" id="askBtn">Ask</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Try a prepared question</label>
+      <div class="chips" id="chips"></div>
+    </div>
+
+    <div class="card">
+      <label>Answer</label>
+      <div id="answer" class="placeholder">Ask a question to see the assistant's answer here.</div>
+      <div class="timings">
+        <span>First word: <b id="ttft">–</b></span>
+        <span>Total: <b id="total">–</b></span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const PREPARED = [
+      "I need a waterproof jacket for hiking under £100",
+      "Gift for a 10 year old who loves science",
+      "Laptop for a student under £600",
+      "Quiet air fryer for a small kitchen",
+      "Comfortable trainers for running under £80",
+      "A board game for a family Christmas",
+      "Robot vacuum for a house with pets",
+      "Warm winter coat under £150",
+      "Headphones for the daily commute",
+      "Tent for a weekend camping trip for two",
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const answer = $("answer"), askBtn = $("askBtn");
+
+    // Prepared question buttons
+    PREPARED.forEach((q) => {
+      const b = document.createElement("button");
+      b.className = "chip";
+      b.textContent = q;
+      b.onclick = () => { $("question").value = q; ask(); };
+      $("chips").appendChild(b);
+    });
+
+    // Show **bold** from the model's markdown, safely
+    function render(text) {
+      const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return escaped.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    }
+
+    async function ask() {
+      const question = $("question").value.trim();
+      const top_k = parseInt($("topk").value, 10) || 5;
+      if (question.length < 3) { $("question").focus(); return; }
+
+      askBtn.disabled = true;
+      answer.className = "";
+      answer.innerHTML = '<span class="spinner"></span>Searching products and thinking…';
+      $("ttft").textContent = "…"; $("total").textContent = "…";
+
+      const start = performance.now();
+      let text = "", firstChunk = true;
+
+      try {
+        const res = await fetch("/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, top_k }),
+        });
+        if (!res.ok) throw new Error(`Server returned ${res.status}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (firstChunk) {
+            $("ttft").textContent = ((performance.now() - start) / 1000).toFixed(2) + " s";
+            firstChunk = false;
+          }
+          text += decoder.decode(value, { stream: true });
+          answer.innerHTML = render(text);
+        }
+        $("total").textContent = ((performance.now() - start) / 1000).toFixed(2) + " s";
+      } catch (err) {
+        answer.innerHTML = `<span class="error">Something went wrong: ${err.message}</span>`;
+        $("ttft").textContent = "–"; $("total").textContent = "–";
+      } finally {
+        askBtn.disabled = false;
+      }
+    }
+
+    askBtn.onclick = ask;
+    $("question").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(); }
+    });
+  </script>
+</body>
+</html>
