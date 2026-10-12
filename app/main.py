@@ -19,13 +19,15 @@ LLM_MODEL = os.getenv("LLM_MODEL", "llama3.2:3b")
 LLM_API_KEY = os.getenv("LLM_API_KEY", "not-needed")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "BAAI/bge-small-en-v1.5")
 DEFAULT_TOP_K = int(os.getenv("TOP_K", "5"))
-MAX_TOKENS = int(os.getenv("MAX_TOKENS", "300"))
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "400"))
 
 SYSTEM_PROMPT = (
     "You are the shopping assistant for an online store during its Black Friday sale. "
     "Answer using only the products provided. Recommend up to 3 that best fit the "
-    "customer's needs and budget, and give each one's normal price and Black Friday price. "
-    "If none of the products fit, say so honestly. Keep the answer short and friendly."
+    "customer's needs and budget. For each, give the name, the normal price, the Black "
+    "Friday price and one short sentence on why it fits. Ignore products that do not "
+    "match what the customer asked for. If none fit, say so honestly. "
+    "Keep the whole answer under 120 words."
 )
 
 # --- Metrics, exposed at /metrics for Alloy to collect ---
